@@ -108,7 +108,7 @@ public class Spherorb extends AppCompatActivity {
             if (mRobot != null)
                 mRobot.sendCommand(new RollCommand(mRobot.getLastHeading(), 0.0f, RollCommand.State.STOP));
         } else {
-            float velocity = Math.abs(y);
+            float velocity = getVelocity(x, y);
             float heading = getHeading(x, -y);
 
             if (mRobot != null)
@@ -133,12 +133,12 @@ public class Spherorb extends AppCompatActivity {
     }
 
     private float getVelocity(float x, float y) {
-        x = x > 0 ? x + 1 : Math.abs(x);
-        y = y > 0 ? y + 1 : Math.abs(y);
+        x = x + 1;
+        y = y + 1;
 
         float slope = y / x;
         float orginDistance = (float) Math.sqrt(x * x + y * y);
-        float maxOrginDistance = (float) Math.sqrt(4 + (slope * 2) * (slope * 2));
+        float maxOrginDistance = (float) Math.sqrt(4 + (slope > 1 ? 2 / slope : 2 * slope));
         return orginDistance / maxOrginDistance;
 
     }
