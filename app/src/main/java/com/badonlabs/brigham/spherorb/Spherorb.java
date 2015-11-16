@@ -1,5 +1,6 @@
 package com.badonlabs.brigham.spherorb;
 
+import android.hardware.input.InputManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.InputDevice;
@@ -9,15 +10,20 @@ import android.widget.Toast;
 
 import com.orbotix.DualStackDiscoveryAgent;
 import com.orbotix.Sphero;
+import com.orbotix.async.CollisionDetectedAsyncData;
 import com.orbotix.classic.RobotClassic;
 import com.orbotix.command.RollCommand;
 import com.orbotix.common.DiscoveryException;
+import com.orbotix.common.ResponseListener;
 import com.orbotix.common.Robot;
 import com.orbotix.common.RobotChangedStateListener;
+import com.orbotix.common.internal.AsyncMessage;
+import com.orbotix.common.internal.DeviceResponse;
 
 public class Spherorb extends AppCompatActivity {
 
     private Sphero mRobot;
+    private InputDevice mGamepad;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +38,28 @@ public class Spherorb extends AppCompatActivity {
                         Toast.makeText(Spherorb.this, "Connected", Toast.LENGTH_SHORT).show();
                         if (robot instanceof RobotClassic) {
                             mRobot = new Sphero(robot);
+                            mRobot.enableStabilization(true);
+                            mRobot.enableCollisions(true);
+                            mRobot.addResponseListener(new ResponseListener() {
+                                @Override
+                                public void handleResponse(DeviceResponse deviceResponse, Robot robot) {
+
+                                }
+
+                                @Override
+                                public void handleStringResponse(String s, Robot robot) {
+
+                                }
+
+                                @Override
+                                public void handleAsyncMessage(AsyncMessage asyncMessage, Robot robot) {
+                                    if(asyncMessage instanceof CollisionDetectedAsyncData) {
+                                        if (mGamepad != null) {
+                                            mGamepad.getVibrator().vibrate(500);
+                                        }
+                                    }
+                                }
+                            });
                         } else {
                             Toast.makeText(Spherorb.this, "Not Compatible", Toast.LENGTH_SHORT).show();
                         }
@@ -49,6 +77,8 @@ public class Spherorb extends AppCompatActivity {
         if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) ==
                 InputDevice.SOURCE_JOYSTICK &&
                 event.getAction() == MotionEvent.ACTION_MOVE) {
+
+            mGamepad = event.getDevice();
 
             final int historySize = event.getHistorySize();
 
@@ -113,7 +143,7 @@ public class Spherorb extends AppCompatActivity {
 
             if (mRobot != null)
                 mRobot.sendCommand(new RollCommand(heading, velocity, RollCommand.State.GO));
-            output += ", Degrees: " + heading + ", Velocity: " + velocity;
+            output += ", Heading: " + heading + ", Velocity: " + velocity;
             status.setText(output);
         }
     }
@@ -133,14 +163,14 @@ public class Spherorb extends AppCompatActivity {
     }
 
     private float getVelocity(float x, float y) {
-        x = x + 1;
-        y = y + 1;
+        y = Math.abs(y);
+        x = Math.abs(x);
 
         float slope = y / x;
-        float orginDistance = (float) Math.sqrt(x * x + y * y);
-        float maxOrginDistance = (float) Math.sqrt(4 + (slope > 1 ? 2 / slope : 2 * slope));
-        return orginDistance / maxOrginDistance;
+        float orginDistance = (float) Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+        float maxOrginDistance = (float) Math.sqrt(1 + Math.pow((slope > 1 ? 1 / slope : slope), 2));
 
+        return orginDistance / maxOrginDistance;
     }
 
     @Override
