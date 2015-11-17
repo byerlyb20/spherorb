@@ -163,12 +163,14 @@ public class Spherorb extends AppCompatActivity {
     }
 
     private float getVelocity(float x, float y) {
+        // Maybe clip values to about .8
         y = Math.abs(y);
         x = Math.abs(x);
 
         float slope = y / x;
         float orginDistance = (float) Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
-        float maxOrginDistance = (float) Math.sqrt(1 + Math.pow((slope > 1 ? 1 / slope : slope), 2));
+        //float maxOrginDistance = (float) Math.sqrt(1 + Math.pow((slope > 1 ? 1 / slope : slope), 2));
+        float maxOrginDistance = 1;
 
         return orginDistance / maxOrginDistance;
     }
