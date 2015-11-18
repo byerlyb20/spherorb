@@ -1,10 +1,11 @@
 package com.badonlabs.brigham.spherorb;
 
-import android.hardware.input.InputManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
 import android.view.InputDevice;
 import android.view.MotionEvent;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,13 +31,18 @@ public class Spherorb extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_spherorb);
 
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
         DualStackDiscoveryAgent.getInstance().addRobotStateListener(new RobotChangedStateListener() {
             @Override
             public void handleRobotChangedState(Robot robot, RobotChangedStateNotificationType type) {
+                ImageView sphero = (ImageView) findViewById(R.id.sphero);
                 switch (type) {
                     case Online:
-                        Toast.makeText(Spherorb.this, "Connected", Toast.LENGTH_SHORT).show();
                         if (robot instanceof RobotClassic) {
+                            Toast.makeText(Spherorb.this, "Connected", Toast.LENGTH_SHORT).show();
+                            sphero.setImageResource(R.drawable.sphero_blue);
                             mRobot = new Sphero(robot);
                             mRobot.enableStabilization(true);
                             mRobot.enableCollisions(true);
@@ -65,6 +71,7 @@ public class Spherorb extends AppCompatActivity {
                         }
                         break;
                     case Disconnected:
+                        sphero.setImageResource(R.drawable.sphero_grey);
                         break;
                 }
             }
