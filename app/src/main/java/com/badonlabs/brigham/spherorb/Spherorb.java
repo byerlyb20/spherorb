@@ -9,6 +9,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.orbotix.ConvenienceRobot;
 import com.orbotix.DualStackDiscoveryAgent;
 import com.orbotix.Sphero;
 import com.orbotix.async.CollisionDetectedAsyncData;
@@ -20,10 +21,11 @@ import com.orbotix.common.Robot;
 import com.orbotix.common.RobotChangedStateListener;
 import com.orbotix.common.internal.AsyncMessage;
 import com.orbotix.common.internal.DeviceResponse;
+import com.orbotix.le.RobotLE;
 
 public class Spherorb extends AppCompatActivity {
 
-    private Sphero mRobot;
+    private ConvenienceRobot mRobot;
     private InputDevice mGamepad;
 
     @Override
@@ -40,10 +42,10 @@ public class Spherorb extends AppCompatActivity {
                 ImageView sphero = (ImageView) findViewById(R.id.sphero);
                 switch (type) {
                     case Online:
-                        if (robot instanceof RobotClassic) {
+                        if (robot instanceof RobotClassic || robot instanceof RobotLE) {
                             Toast.makeText(Spherorb.this, "Connected", Toast.LENGTH_SHORT).show();
                             sphero.setImageResource(R.drawable.sphero_blue);
-                            mRobot = new Sphero(robot);
+                            mRobot = new ConvenienceRobot(robot);
                             mRobot.enableStabilization(true);
                             mRobot.enableCollisions(true);
                             mRobot.addResponseListener(new ResponseListener() {
