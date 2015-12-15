@@ -3,6 +3,7 @@ package com.badonlabs.brigham.spherorb;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.widget.ImageView;
@@ -11,7 +12,6 @@ import android.widget.Toast;
 
 import com.orbotix.ConvenienceRobot;
 import com.orbotix.DualStackDiscoveryAgent;
-import com.orbotix.Sphero;
 import com.orbotix.async.CollisionDetectedAsyncData;
 import com.orbotix.classic.RobotClassic;
 import com.orbotix.command.RollCommand;
@@ -27,6 +27,7 @@ public class Spherorb extends AppCompatActivity {
 
     private ConvenienceRobot mRobot;
     private InputDevice mGamepad;
+    private final static String TAG = "Spherorb";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -135,7 +136,22 @@ public class Spherorb extends AppCompatActivity {
         float y = getCenteredAxis(event, mInputDevice,
                 MotionEvent.AXIS_Y, historyPos);
 
+        float x2 = getCenteredAxis(event, mInputDevice,
+                MotionEvent.AXIS_Z, historyPos);
+
+        float y2 = getCenteredAxis(event, mInputDevice,
+                MotionEvent.AXIS_RZ, historyPos);
+
+        Log.v(TAG, "The x, y coordinates for the second joystick are: " + x2 + ", " + y2);
+
         onControllerMoved(x, y);
+        calibrateSphero(x2, y2);
+    }
+
+    protected void calibrateSphero(float x, float y) {
+        float heading = getHeading(x, -y);
+        mRobot.drive(heading, 0);
+        mRobot.setZeroHeading();
     }
 
     protected void onControllerMoved(float x, float y) {
