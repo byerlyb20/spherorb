@@ -1,10 +1,11 @@
 package com.badonlabs.brigham.spherorb;
 
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -27,7 +28,6 @@ public class Spherorb extends AppCompatActivity {
 
     private ConvenienceRobot mRobot;
     private InputDevice mGamepad;
-    private final static String TAG = "Spherorb";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +62,7 @@ public class Spherorb extends AppCompatActivity {
 
                                 @Override
                                 public void handleAsyncMessage(AsyncMessage asyncMessage, Robot robot) {
-                                    if(asyncMessage instanceof CollisionDetectedAsyncData) {
+                                    if (asyncMessage instanceof CollisionDetectedAsyncData) {
                                         if (mGamepad != null) {
                                             mGamepad.getVibrator().vibrate(500);
                                         }
@@ -74,6 +74,7 @@ public class Spherorb extends AppCompatActivity {
                         }
                         break;
                     case Disconnected:
+                        Toast.makeText(Spherorb.this, "Disconnected", Toast.LENGTH_SHORT).show();
                         sphero.setImageResource(R.drawable.sphero_grey);
                         break;
                 }
@@ -84,21 +85,24 @@ public class Spherorb extends AppCompatActivity {
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
 
-        if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) ==
-                InputDevice.SOURCE_JOYSTICK &&
-                event.getAction() == MotionEvent.ACTION_MOVE) {
+        try {
 
-            mGamepad = event.getDevice();
+            if (event.isFromSource(InputDevice.SOURCE_CLASS_JOYSTICK) && (event.getAction() == MotionEvent.ACTION_MOVE)) {
 
-            final int historySize = event.getHistorySize();
+                mGamepad = event.getDevice();
 
-            for (int i = 0; i < historySize; i++) {
-                processJoystickInput(event, i);
+                for (int i = 0; i < event.getHistorySize(); i++) {
+                    processJoystickInput(event, i, event.isButtonPressed(KeyEvent.KEYCODE_BUTTON_A));
+                }
+
+                processJoystickInput(event, -1, event.isButtonPressed(KeyEvent.KEYCODE_BUTTON_A));
+                return true;
             }
 
-            processJoystickInput(event, -1);
-            return true;
+        } catch (Exception e) {
+            showErrorDialog(e);
         }
+
         return super.onGenericMotionEvent(event);
     }
 
@@ -126,26 +130,31 @@ public class Spherorb extends AppCompatActivity {
         return 0;
     }
 
-    private void processJoystickInput(MotionEvent event, int historyPos) {
+    private void processJoystickInput(MotionEvent event, int historyPos, boolean calibrate) {
 
-        InputDevice mInputDevice = event.getDevice();
+        try {
 
-        float x = getCenteredAxis(event, mInputDevice,
-                MotionEvent.AXIS_X, historyPos);
+            InputDevice mInputDevice = event.getDevice();
 
-        float y = getCenteredAxis(event, mInputDevice,
-                MotionEvent.AXIS_Y, historyPos);
+            float x = getCenteredAxis(event, mInputDevice,
+                    MotionEvent.AXIS_X, historyPos);
 
-        float x2 = getCenteredAxis(event, mInputDevice,
-                MotionEvent.AXIS_Z, historyPos);
+            float y = getCenteredAxis(event, mInputDevice,
+                    MotionEvent.AXIS_Y, historyPos);
 
-        float y2 = getCenteredAxis(event, mInputDevice,
-                MotionEvent.AXIS_RZ, historyPos);
+            TextView status = (TextView) findViewById(R.id.status);
+            String output = "X Value: " + x + ", Y Value: " + y;
+            status.setText(output);
 
-        Log.v(TAG, "The x, y coordinates for the second joystick are: " + x2 + ", " + y2);
+            if (calibrate) {
+                calibrateSphero(x, y);
+            } else {
+                onControllerMoved(x, y);
+            }
 
-        onControllerMoved(x, y);
-        calibrateSphero(x2, y2);
+        } catch (Exception e) {
+            showErrorDialog(e);
+        }
     }
 
     protected void calibrateSphero(float x, float y) {
@@ -155,21 +164,27 @@ public class Spherorb extends AppCompatActivity {
     }
 
     protected void onControllerMoved(float x, float y) {
-        TextView status = (TextView) findViewById(R.id.status);
+        /*TextView status = (TextView) findViewById(R.id.status);
         String output = "X Value: " + x + ", Y Value: " + y;
-        status.setText(output);
+        status.setText(output);*/
 
-        if (y == 0) {
-            if (mRobot != null)
-                mRobot.sendCommand(new RollCommand(mRobot.getLastHeading(), 0.0f, RollCommand.State.STOP));
-        } else {
-            float velocity = getVelocity(x, y);
-            float heading = getHeading(x, -y);
+        try {
 
-            if (mRobot != null)
-                mRobot.sendCommand(new RollCommand(heading, velocity, RollCommand.State.GO));
-            output += ", Heading: " + heading + ", Velocity: " + velocity;
-            status.setText(output);
+            if (y == 0) {
+                if (mRobot != null)
+                    mRobot.sendCommand(new RollCommand(mRobot.getLastHeading(), 0.0f, RollCommand.State.STOP));
+            } else {
+                float velocity = getVelocity(x, y);
+                float heading = getHeading(x, -y);
+
+                if (mRobot != null)
+                    mRobot.sendCommand(new RollCommand(heading, velocity, RollCommand.State.GO));
+                //output += ", Heading: " + heading + ", Velocity: " + velocity;
+                //status.setText(output);
+            }
+
+        } catch (Exception e) {
+            showErrorDialog(e);
         }
     }
 
@@ -215,5 +230,12 @@ public class Spherorb extends AppCompatActivity {
     protected void onStop() {
         if (mRobot != null) mRobot.disconnect();
         super.onStop();
+    }
+
+    private void showErrorDialog(Exception e) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Exception")
+                .setMessage(e.getMessage());
+        builder.create().show();
     }
 }
