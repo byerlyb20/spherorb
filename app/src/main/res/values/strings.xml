@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">Spherorb</string>
+
+    <string name="action_toggle_stats">Stats for nerds</string>
+
+    <string name="event_connected">Connected</string>
+    <string name="event_disconnected">Disconnected</string>
+    <string name="event_collision">Collision Detected</string>
+    <string name="event_not_compatible">Not Compatible</string>
+
+    <string name="stats_controller">X Value: %1$f, Y Value: %2$f</string>
+    <string name="stats_robot">Velocity: %1$f, Heading: %2$f</string>
 </resources>

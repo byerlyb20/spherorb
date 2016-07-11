@@ -1,15 +1,19 @@
 package com.badonlabs.brigham.spherorb;
 
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.Snackbar;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.InputDevice;
-import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.orbotix.ConvenienceRobot;
 import com.orbotix.DualStackDiscoveryAgent;
@@ -28,6 +32,10 @@ public class Spherorb extends AppCompatActivity {
 
     private ConvenienceRobot mRobot;
     private InputDevice mGamepad;
+    private CoordinatorLayout mParentLayout;
+    private LinearLayout mStats;
+    private TextView mStatus;
+    private TextView mProcessedStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,8 +52,12 @@ public class Spherorb extends AppCompatActivity {
                 switch (type) {
                     case Online:
                         if (robot instanceof RobotClassic || robot instanceof RobotLE) {
-                            Toast.makeText(Spherorb.this, "Connected", Toast.LENGTH_SHORT).show();
-                            sphero.setImageResource(R.drawable.sphero_blue);
+                            showMessage(R.string.event_connected);
+                            if (robot instanceof RobotLE) {
+                                sphero.setImageResource(R.drawable.ollie_blue);
+                            } else {
+                                sphero.setImageResource(R.drawable.sphero_blue);
+                            }
                             mRobot = new ConvenienceRobot(robot);
                             mRobot.enableStabilization(true);
                             mRobot.enableCollisions(true);
@@ -66,48 +78,76 @@ public class Spherorb extends AppCompatActivity {
                                         if (mGamepad != null) {
                                             mGamepad.getVibrator().vibrate(500);
                                         }
+                                        showMessage(R.string.event_collision);
                                     }
                                 }
                             });
                         } else {
-                            Toast.makeText(Spherorb.this, "Not Compatible", Toast.LENGTH_SHORT).show();
+                            showMessage(R.string.event_not_compatible);
                         }
                         break;
                     case Disconnected:
-                        Toast.makeText(Spherorb.this, "Disconnected", Toast.LENGTH_SHORT).show();
+                        showMessage(R.string.event_disconnected);
                         sphero.setImageResource(R.drawable.sphero_grey);
                         break;
                 }
             }
         });
+        mParentLayout = (CoordinatorLayout) findViewById(R.id.parentLayout);
+        mStats = (LinearLayout) findViewById(R.id.stats);
+        mStatus = (TextView) findViewById(R.id.controllerData);
+        mProcessedStatus = (TextView) findViewById(R.id.robotData);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_spherorb, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_toggle_stats:
+                if (item.isChecked()) {
+                    item.setChecked(false);
+                    mStats.setVisibility(View.GONE);
+                } else {
+                    item.setChecked(true);
+                    mStats.setVisibility(View.VISIBLE);
+                }
+                return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
+        InputDevice device = event.getDevice();
+        if (isGameController(device)) {
+            mGamepad = device;
 
-        try {
-
-            if (event.isFromSource(InputDevice.SOURCE_CLASS_JOYSTICK) && (event.getAction() == MotionEvent.ACTION_MOVE)) {
-
-                mGamepad = event.getDevice();
-
-                for (int i = 0; i < event.getHistorySize(); i++) {
-                    processJoystickInput(event, i, event.isButtonPressed(KeyEvent.KEYCODE_BUTTON_A));
-                }
-
-                processJoystickInput(event, -1, event.isButtonPressed(KeyEvent.KEYCODE_BUTTON_A));
-                return true;
+            for (int i = 0; i < event.getHistorySize(); i++) {
+                processJoystickInput(event, i);
             }
 
-        } catch (Exception e) {
-            showErrorDialog(e);
+            processJoystickInput(event, -1);
+            return true;
         }
 
         return super.onGenericMotionEvent(event);
     }
 
-    private static float getCenteredAxis(MotionEvent event,
-                                         InputDevice device, int axis, int historyPos) {
+    private boolean isGameController(InputDevice device) {
+        int sources = device.getSources();
+        return ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
+                || ((sources & InputDevice.SOURCE_JOYSTICK)
+                == InputDevice.SOURCE_JOYSTICK);
+    }
+
+    private float getCenteredAxis(MotionEvent event,
+                                  InputDevice device, int axis, int historyPos) {
         final InputDevice.MotionRange range =
                 device.getMotionRange(axis, event.getSource());
 
@@ -116,9 +156,8 @@ public class Spherorb extends AppCompatActivity {
         // bounding the joystick axis center.
         if (range != null) {
             final float flat = range.getFlat();
-            float value =
-                    historyPos < 0 ? event.getAxisValue(axis) :
-                            event.getHistoricalAxisValue(axis, historyPos);
+            float value = historyPos < 0 ? event.getAxisValue(axis) :
+                    event.getHistoricalAxisValue(axis, historyPos);
 
             // Ignore axis values that are within the 'flat' region of the
             // joystick axis center.
@@ -130,61 +169,43 @@ public class Spherorb extends AppCompatActivity {
         return 0;
     }
 
-    private void processJoystickInput(MotionEvent event, int historyPos, boolean calibrate) {
+    private void processJoystickInput(MotionEvent event, int historyPos) {
+        float x = getCenteredAxis(event, mGamepad, MotionEvent.AXIS_X, historyPos);
+        float y = getCenteredAxis(event, mGamepad, MotionEvent.AXIS_Y, historyPos);
+        float x2 = getCenteredAxis(event, mGamepad, MotionEvent.AXIS_Z, historyPos);
+        float y2 = getCenteredAxis(event, mGamepad, MotionEvent.AXIS_RZ, historyPos);
 
-        try {
+        Resources res = getResources();
+        String output = res.getString(R.string.stats_controller, x, y);
+        mStatus.setText(output);
 
-            InputDevice mInputDevice = event.getDevice();
+        onControllerMoved(x, y);
+        onCalibrateRobot(x2, y2);
+    }
 
-            float x = getCenteredAxis(event, mInputDevice,
-                    MotionEvent.AXIS_X, historyPos);
-
-            float y = getCenteredAxis(event, mInputDevice,
-                    MotionEvent.AXIS_Y, historyPos);
-
-            TextView status = (TextView) findViewById(R.id.status);
-            String output = "X Value: " + x + ", Y Value: " + y;
-            status.setText(output);
-
-            if (calibrate) {
-                calibrateSphero(x, y);
-            } else {
-                onControllerMoved(x, y);
-            }
-
-        } catch (Exception e) {
-            showErrorDialog(e);
+    protected void onCalibrateRobot(float x, float y) {
+        if (mRobot != null) {
+            float heading = getHeading(x, -y);
+            mRobot.drive(heading, 0);
+            mRobot.setZeroHeading();
         }
     }
 
-    protected void calibrateSphero(float x, float y) {
-        float heading = getHeading(x, -y);
-        mRobot.drive(heading, 0);
-        mRobot.setZeroHeading();
-    }
-
     protected void onControllerMoved(float x, float y) {
-        /*TextView status = (TextView) findViewById(R.id.status);
-        String output = "X Value: " + x + ", Y Value: " + y;
-        status.setText(output);*/
+        float velocity = getVelocity(x, y);
+        float heading = getHeading(x, -y);
 
-        try {
+        Resources res = getResources();
+        String output = res.getString(R.string.stats_robot, velocity, heading);
+        mProcessedStatus.setText(output);
 
+        if (mRobot != null) {
             if (y == 0) {
-                if (mRobot != null)
-                    mRobot.sendCommand(new RollCommand(mRobot.getLastHeading(), 0.0f, RollCommand.State.STOP));
+                mRobot.sendCommand(new RollCommand(mRobot.getLastHeading(), 0.0f,
+                        RollCommand.State.STOP));
             } else {
-                float velocity = getVelocity(x, y);
-                float heading = getHeading(x, -y);
-
-                if (mRobot != null)
-                    mRobot.sendCommand(new RollCommand(heading, velocity, RollCommand.State.GO));
-                //output += ", Heading: " + heading + ", Velocity: " + velocity;
-                //status.setText(output);
+                mRobot.sendCommand(new RollCommand(heading, velocity, RollCommand.State.GO));
             }
-
-        } catch (Exception e) {
-            showErrorDialog(e);
         }
     }
 
@@ -207,12 +228,12 @@ public class Spherorb extends AppCompatActivity {
         y = Math.abs(y);
         x = Math.abs(x);
 
-        float slope = y / x;
-        float orginDistance = (float) Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
-        //float maxOrginDistance = (float) Math.sqrt(1 + Math.pow((slope > 1 ? 1 / slope : slope), 2));
-        float maxOrginDistance = 1;
+        //float slope = y / x;
+        float originDistance = (float) Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+        //float maxOriginDistance = (float) Math.sqrt(1 + Math.pow((slope > 1 ? 1 / slope : slope), 2));
+        float maxOriginDistance = 1;
 
-        return orginDistance / maxOrginDistance;
+        return originDistance / maxOriginDistance;
     }
 
     @Override
@@ -228,14 +249,14 @@ public class Spherorb extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        if (mRobot != null) mRobot.disconnect();
+        if (mRobot != null) {
+            mRobot.disconnect();
+        }
         super.onStop();
     }
 
-    private void showErrorDialog(Exception e) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Exception")
-                .setMessage(e.getMessage());
-        builder.create().show();
+    private void showMessage(int msg) {
+        Snackbar.make(mParentLayout, msg, Snackbar.LENGTH_SHORT)
+                .show();
     }
 }
